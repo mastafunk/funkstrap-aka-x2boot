@@ -34,7 +34,6 @@ echo `date` >> /data/2nd-init/log
     chmod 777 /sbin/*
     # cp new rootfs
     busybox rm /*
-    ls -l / > /data/2nd-init/mvlog 2>&1
     busybox cp /system/x2boot/rootfs/* /
     # make sure writes are complete
     sync;sync
@@ -46,7 +45,7 @@ echo `date` >> /data/2nd-init/log
     # setup adbd
     /system/bin/toolbox setprop persist.adb.enable_NV_DISABLED 1
     #/system/bin/toolbox setprop ro.debuggable 1
-    #/sbin/adbd > /data/2nd-init/devlog.log&
+    /sbin/adbd > /data/2nd-init/devlog.log&
     /sbin/logcat > /data/2nd-init/logcat-pre.log&
     # log the current processes
     /sbin/busybox ps > /data/2nd-init/ps-prelog.txt
