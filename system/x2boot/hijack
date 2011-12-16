@@ -1,0 +1,108 @@
+#!/system/bin/sh
+PATH=/system/x2boot/sbin:/system/bin:/system/xbin
+
+# get some variables
+USBMODE=$(getprop ro.usb_mode)
+AFFINITY=$(taskset -p 1 | awk {'print $6'})
+
+# if this is normal boot just move on
+if [ "$USBMODE" != "debug" ]; then
+/system/bin/mot_boot_mode.bin "$@"
+fi
+
+# create logdir if it doesnt exist
+if [ ! -d /data/2nd-init ]; then
+  mkdir /data/2nd-init
+fi
+
+# start hijack condition
+if [ "$USBMODE" = "debug" ]; then
+
+# log date & mode
+echo "$USBMODE" > /data/2nd-init/log
+echo `date` >> /data/2nd-init/log
+
+  # do this on the first iteration
+  if [ "$AFFINITY" -eq 3 ]; then
+
+    # log our attempt
+    echo "Attempting 2nd-init" >> /data/2nd-init/log
+    # mount root rw
+    /system/bin/toolbox mount -o remount,rw rootfs / >> /data/2nd-init/log 2>&1
+    # cp and set permission on new sbin
+    cp -p /system/x2boot/sbin/* /sbin
+    chmod 777 /sbin/*
+    # cp new rootfs
+    busybox rm /*
+    ls -l / > /data/2nd-init/mvlog 2>&1
+    busybox cp /system/x2boot/rootfs/* /
+    # make sure writes are complete
+    sync;sync
+    # log the file structures of sbin and rootfs
+    ls -l / >> /data/2nd-init/mvlog 2>&1
+    ls -l /sbin > /data/2nd-init/mvsbinlog 2>&1
+    # make sure log writes are complete
+    sync;sync
+    # setup adbd
+    /system/bin/toolbox setprop persist.adb.enable_NV_DISABLED 1
+    #/system/bin/toolbox setprop ro.debuggable 1
+    #/sbin/adbd > /data/2nd-init/devlog.log&
+    /sbin/logcat > /data/2nd-init/logcat-pre.log&
+    # log the current processes
+    /sbin/busybox ps > /data/2nd-init/ps-prelog.txt
+    # commit the final set of logs
+    sync;sync
+
+    # take no prisoners killall processes but this one
+    /sbin/busybox sleep 1s
+    /sbin/busybox killall5
+    /sbin/busybox sleep 1s
+
+    # unmount /tmp
+    for i in $(/sbin/busybox seq 1 10); do
+	TMP=$(/sbin/busybox mount | /sbin/busybox grep /tmp)
+	if /sbin/busybox [[ -z "$TMP" ]] ; then
+		break
+	fi
+	/sbin/busybox umount -l /tmp
+	/sbin/busybox sleep 1
+    done
+
+    # unmount all ext3 partitions
+    for i in $(/sbin/busybox seq 1 10); do
+	TMP=$(/sbin/busybox mount | /sbin/busybox grep ext3 | /sbin/busybox awk '{print $3}')
+	if /sbin/busybox [[ -z "$TMP" ]] ; then
+		break;
+	fi
+	for j in $(/sbin/busybox mount | /sbin/busybox grep ext3 | /sbin/busybox awk '{print $3}'); do
+		/sbin/busybox umount -l "$j"
+	done
+	/sbin/busybox sleep 1
+    done
+
+    # kill any existing adbd processes
+    #/sbin/busybox kill $(/sbin/busybox ps | /sbin/busybox grep adbd)
+    #/sbin/busybox echo "msc_adb" > /dev/usb_device_mode
+
+    # try to remove our sockets!
+    /sbin/busybox rm -f /dev/socket/*
+
+    # pull init to processor 0 and fireup 2nd-init
+    /sbin/busybox sleep 1
+    #/sbin/taskset -p -c 0 1 >> /data/2nd-init/log 2>&1
+    /sbin/taskset -p -c 0 1
+    #/sbin/taskset -c 0 /sbin/2nd-init >> /data/2nd-init/log 2>&1
+    /sbin/taskset -c 0 /sbin/2nd-init
+
+  # this is the second interation
+  else
+
+    # log success
+    echo "We Made it around This is being called from the new init.rc" >> /data/2nd-init/log 2>&1
+    # push init back to both cpus
+    taskset -p -c 0,1 1 >> /data/2nd-init/log 2>&1
+    # continue on like nothing happened
+    /system/bin/mot_boot_mode.bin "$@"
+  fi
+
+fi

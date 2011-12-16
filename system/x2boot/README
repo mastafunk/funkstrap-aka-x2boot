@@ -1,0 +1,40 @@
+X2 bootmod .2
+
+Install Instructions
+---------------------------
+1)  Download from iswarm.net/x2boot-alpha2.tgz and extract x2boot-alpha2.tgz
+2) On phone mount / and /system R/W
+2) Copy contents of x2boot /system to phones /system (I used Root Explorer)
+   2a) I first pushed the x2boot folder to /sdcard/ using adb - adb push x2boot /sdcard/
+   2b) I then created x2boot in /system on the phone
+   2c) I then copied the files from /sdcard/x2boot to /system/x2boot
+3) Copy the files from system / to /system/x2boot/rootfs/   (note: overwrite the default.prop)
+4) Change directory /system/bin
+5) Rename mot_boot_mode to mot_boot_mode.bin
+6) Create a link - ln -s /system/x2boot/hijack /system/bin/mot_boot_mode
+7) Change directory /system/x2boot/
+8) chmod 777 hijack (just to be safe)
+9) Change directory /system/x2boot/rootfs
+10) Edit init.rc (To put a logcheck in your new init.rc)
+    10a) Find the line - exec /system/bin/mot_boot_mode
+    10b) Add this line after it - write /data/2nd-init/inittest 1
+11) Clean up /data/2nd-init if it contains files
+12) Delete /data/logcat-pre.log if it exists
+
+   Test 2nd-init
+   -------------
+   1) Shutdown phone
+   2) Hold Vol Down button while holding down the Power button
+   3) Once Fastboot appears hit Vol Down until you see USB Enum
+   4) Press Vol Up
+   5) The phone should boot without seeing a green LED   
+
+All logs will be in /data/2nd-init
+   
+To kill the logging
+====================
+Reboot without 2nd-init
+or
+#ps | grep logcat
+look for the PID for /sbin/logcat
+then type: kill <PID>  (ex: 1370)
